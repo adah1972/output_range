@@ -30,12 +30,36 @@
  *
  */
 
-#ifndef OUTPUT_CONTAINER_H
-#define OUTPUT_CONTAINER_H
+#ifndef OUTPUT_RANGE_H
+#define OUTPUT_RANGE_H
 
+#include <iterator>     // std::begin/end
 #include <ostream>      // std::ostream
-#include <type_traits>  // std::false_type/true_type/decay_t/is_same_v
-#include <utility>      // std::declval/pair
+#include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
+#include <utility>      // std::declval/forward/pair
+
+namespace output_range {
+
+using std::begin;
+using std::end;
+
+template <class Rng>
+auto adl_begin(Rng&& rng) -> decltype(begin(rng))
+{
+    // Intentionally not using std::forward, as std::begin does not
+    // accept an rvalue reference.
+    return begin(rng);
+}
+
+template <class Rng>
+auto adl_end(Rng&& rng) -> decltype(end(rng))
+{
+    // Intentionally not using std::forward, as std::end does not
+    // accept an rvalue reference.
+    return end(rng);
+}
+
+}  // namespace output_range
 
 // Type trait to detect std::pair
 template <typename T>
@@ -57,13 +81,15 @@ struct has_output_function {
     static constexpr bool value =
         decltype(output<T>(nullptr))::value;
 };
+#ifndef OUTPUT_RANGE_NO_ARRAY_OUTPUT
+template <typename T, std::size_t N>
+struct has_output_function<T[N]> : std::false_type {};
+template <std::size_t N>
+struct has_output_function<char[N]> : std::true_type {};
+#endif
 template <typename T>
 inline constexpr bool has_output_function_v =
     has_output_function<T>::value;
-/* NB: Visual Studio 2017 (or below) may have problems with
- *     has_output_function_v<T>: you should then use
- *     has_output_function<T>::value instead, or upgrade to
- *     Visual Studio 2019. */
 
 // Output function for std::pair
 template <typename T, typename U>
@@ -82,22 +108,25 @@ auto output_element(std::ostream& os, const T& element,
     -> decltype(os);
 
 // Main output function, enabled only if no output function already exists
-template <typename T,
-          typename = std::enable_if_t<!has_output_function_v<T>>>
-auto operator<<(std::ostream& os, const T& container)
-    -> decltype(container.begin(), container.end(), os)
+template <typename T, typename = std::enable_if_t<!has_output_function_v<
+                          std::remove_cv_t<std::remove_reference_t<T>>>>>
+auto operator<<(std::ostream& os, T&& container)
+    -> decltype(output_range::adl_begin(std::forward<T>(container)),
+                output_range::adl_end(std::forward<T>(container)), os)
 {
     using std::decay_t;
     using std::is_same_v;
 
-    using element_type = decay_t<decltype(*container.begin())>;
+    using element_type = decay_t<decltype(
+        *output_range::adl_begin(std::forward<T>(container)))>;
     constexpr bool is_char_v = is_same_v<element_type, char>;
     if constexpr (!is_char_v) {
         os << '{';
     }
-    auto end = container.end();
+    auto end = output_range::adl_end(std::forward<T>(container));
     bool on_first_element = true;
-    for (auto it = container.begin(); it != end; ++it) {
+    for (auto it = output_range::adl_begin(std::forward<T>(container));
+         it != end; ++it) {
         if constexpr (is_char_v) {
             if (*it == '\0') {
                 break;
@@ -110,7 +139,8 @@ auto operator<<(std::ostream& os, const T& container)
                 on_first_element = false;
             }
         }
-        output_element(os, *it, container, is_pair<element_type>());
+        output_element(os, *it, std::forward<T>(container),
+                       is_pair<element_type>());
     }
     if constexpr (!is_char_v) {
         if (!on_first_element) {  // Not empty
@@ -146,4 +176,4 @@ std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr)
     return os;
 }
 
-#endif // OUTPUT_CONTAINER_H
+#endif // OUTPUT_RANGE_H
