@@ -35,6 +35,7 @@
 
 #include <iterator>     // std::begin/end
 #include <ostream>      // std::ostream
+#include <tuple>        // std::tuple
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
 #include <utility>      // std::declval/forward/pair
 
@@ -94,6 +95,10 @@ inline constexpr bool has_output_function_v =
 // Output function for std::pair
 template <typename T, typename U>
 std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr);
+
+// Output function for std::tuple
+template <typename... Args>
+std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args);
 
 // Element output function for containers that define a key_type and
 // have its value type as std::pair
@@ -173,6 +178,24 @@ template <typename T, typename U>
 std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr)
 {
     os << '(' << pr.first << ", " << pr.second << ')';
+    return os;
+}
+
+template <typename Tup, std::size_t... Is>
+void output_tuple_members(std::ostream& os, const Tup& tup,
+                          std::index_sequence<Is...>)
+{
+    ((os << (Is != 0 ? ", " : "") << std::get<Is>(tup)), ...);
+}
+
+template <typename... Args>
+std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args)
+{
+    os << '(';
+    output_tuple_members(
+        os, args,
+        std::make_index_sequence<std::tuple_size_v<std::tuple<Args...>>>{});
+    os << ')';
     return os;
 }
 
