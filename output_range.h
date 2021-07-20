@@ -102,35 +102,36 @@ std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args);
 
 // Element output function for containers that define a key_type and
 // have its value type as std::pair
-template <typename T, typename Cont>
+template <typename T, typename Rng>
 auto output_element(std::ostream& os, const T& element,
-                    const Cont&, std::true_type)
-    -> decltype(std::declval<typename Cont::key_type>(), os);
+                    const Rng&, std::true_type)
+    -> decltype(std::declval<typename Rng::key_type>(), os);
 // Element output function for other containers
-template <typename T, typename Cont>
+template <typename T, typename Rng>
 auto output_element(std::ostream& os, const T& element,
-                    const Cont&, ...)
+                    const Rng&, ...)
     -> decltype(os);
 
 // Main output function, enabled only if no output function already exists
-template <typename T, typename = std::enable_if_t<!has_output_function_v<
-                          std::remove_cv_t<std::remove_reference_t<T>>>>>
-auto operator<<(std::ostream& os, T&& container)
-    -> decltype(output_range::adl_begin(std::forward<T>(container)),
-                output_range::adl_end(std::forward<T>(container)), os)
+template <typename Rng,
+          typename = std::enable_if_t<!has_output_function_v<
+              std::remove_cv_t<std::remove_reference_t<Rng>>>>>
+auto operator<<(std::ostream& os, Rng&& rng)
+    -> decltype(output_range::adl_begin(std::forward<Rng>(rng)),
+                output_range::adl_end(std::forward<Rng>(rng)), os)
 {
     using std::decay_t;
     using std::is_same_v;
 
-    using element_type = decay_t<decltype(
-        *output_range::adl_begin(std::forward<T>(container)))>;
+    using element_type =
+        decay_t<decltype(*output_range::adl_begin(std::forward<Rng>(rng)))>;
     constexpr bool is_char_v = is_same_v<element_type, char>;
     if constexpr (!is_char_v) {
         os << '{';
     }
-    auto end = output_range::adl_end(std::forward<T>(container));
+    auto end = output_range::adl_end(std::forward<Rng>(rng));
     bool on_first_element = true;
-    for (auto it = output_range::adl_begin(std::forward<T>(container));
+    for (auto it = output_range::adl_begin(std::forward<Rng>(rng));
          it != end; ++it) {
         if constexpr (is_char_v) {
             if (*it == '\0') {
@@ -144,7 +145,7 @@ auto operator<<(std::ostream& os, T&& container)
                 on_first_element = false;
             }
         }
-        output_element(os, *it, std::forward<T>(container),
+        output_element(os, *it, std::forward<Rng>(rng),
                        is_pair<element_type>());
     }
     if constexpr (!is_char_v) {
@@ -156,18 +157,18 @@ auto operator<<(std::ostream& os, T&& container)
     return os;
 }
 
-template <typename T, typename Cont>
+template <typename T, typename Rng>
 auto output_element(std::ostream& os, const T& element,
-                    const Cont&, std::true_type)
-    -> decltype(std::declval<typename Cont::key_type>(), os)
+                    const Rng&, std::true_type)
+    -> decltype(std::declval<typename Rng::key_type>(), os)
 {
     os << element.first << " => " << element.second;
     return os;
 }
 
-template <typename T, typename Cont>
+template <typename T, typename Rng>
 auto output_element(std::ostream& os, const T& element,
-                    const Cont&, ...)
+                    const Rng&, ...)
     -> decltype(os)
 {
     os << element;
@@ -199,4 +200,4 @@ std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args)
     return os;
 }
 
-#endif // OUTPUT_RANGE_H
+#endif  // OUTPUT_RANGE_H
