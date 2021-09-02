@@ -193,9 +193,7 @@ template <typename... Args>
 std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args)
 {
     os << '(';
-    output_tuple_members(
-        os, args,
-        std::make_index_sequence<std::tuple_size_v<std::tuple<Args...>>>{});
+    output_tuple_members(os, args, std::index_sequence_for<Args...>{});
     os << ')';
     return os;
 }
