@@ -94,6 +94,16 @@ template <typename T, std::size_t N>
 struct has_output_function<T[N]> : std::false_type {};
 template <std::size_t N>
 struct has_output_function<char[N]> : std::true_type {};
+template <std::size_t N>
+struct has_output_function<signed char[N]> : std::true_type {};
+template <std::size_t N>
+struct has_output_function<unsigned char[N]> : std::true_type {};
+template <std::size_t N>
+struct has_output_function<const char[N]> : std::true_type {};
+template <std::size_t N>
+struct has_output_function<const signed char[N]> : std::true_type {};
+template <std::size_t N>
+struct has_output_function<const unsigned char[N]> : std::true_type {};
 #endif
 template <typename T>
 inline constexpr bool has_output_function_v =
