@@ -33,9 +33,10 @@
 #ifndef OUTPUT_RANGE_H
 #define OUTPUT_RANGE_H
 
+#include <cstddef>      // std::byte
 #include <iterator>     // std::begin/end
 #include <ostream>      // std::ostream
-#include <tuple>        // std::tuple
+#include <tuple>        // std::tuple/tuple_size
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
 #include <utility>      // std::declval/forward/pair
 
@@ -207,7 +208,12 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
                     ...)
     -> decltype(os)
 {
-    os << element;
+    if constexpr (std::is_same_v<T, unsigned char> ||
+                  std::is_same_v<T, std::byte>) {
+        os << static_cast<unsigned>(element);
+    } else {
+        os << element;
+    }
     return os;
 }
 
