@@ -149,35 +149,24 @@ auto operator<<(std::ostream& os, Rng&& rng)
 
     using element_type =
         decay_t<decltype(*output_range::adl_begin(std::forward<Rng>(rng)))>;
-    constexpr bool is_char_v = is_same_v<element_type, char>;
-    if constexpr (!is_char_v) {
-        os << '{';
-    }
+    os << '{';
     auto end = output_range::adl_end(std::forward<Rng>(rng));
     bool on_first_element = true;
     for (auto it = output_range::adl_begin(std::forward<Rng>(rng));
          it != end; ++it) {
-        if constexpr (is_char_v) {
-            if (*it == '\0') {
-                break;
-            }
+        if (!on_first_element) {
+            os << ", ";
         } else {
-            if (!on_first_element) {
-                os << ", ";
-            } else {
-                os << ' ';
-                on_first_element = false;
-            }
+            os << ' ';
+            on_first_element = false;
         }
         output_range::output_element(os, *it, std::forward<Rng>(rng),
                                      output_range::is_pair<element_type>{});
     }
-    if constexpr (!is_char_v) {
-        if (!on_first_element) {  // Not empty
-            os << ' ';
-        }
-        os << '}';
+    if (!on_first_element) {  // Not empty
+        os << ' ';
     }
+    os << '}';
     return os;
 }
 
@@ -199,7 +188,9 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
                     std::true_type)
     -> decltype(std::declval<typename Rng::key_type>(), os)
 {
-    os << element.first << " => " << element.second;
+    output_element(os, element.first, element);
+    os << " => ";
+    output_element(os, element.second, element);
     return os;
 }
 
@@ -208,8 +199,11 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
                     ...)
     -> decltype(os)
 {
-    if constexpr (std::is_same_v<T, unsigned char> ||
-                  std::is_same_v<T, std::byte>) {
+    if constexpr (std::is_same_v<T, char> ||
+                  std::is_same_v<T, signed char>) {
+        os << '\'' << element << '\'';
+    } else if constexpr (std::is_same_v<T, unsigned char> ||
+                         std::is_same_v<T, std::byte>) {
         os << static_cast<unsigned>(element);
     } else {
         os << element;
@@ -222,7 +216,8 @@ void output_tuple_members(std::ostream& os, const Tup& tup,
                           std::index_sequence<Is...>)
 {
     using std::get;
-    ((os << (Is != 0 ? ", " : "") << get<Is>(tup)), ...);
+    ((os << (Is != 0 ? ", " : ""), output_element(os, get<Is>(tup), tup)),
+     ...);
 }
 
 }  // namespace output_range
