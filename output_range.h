@@ -70,6 +70,15 @@ struct is_pair<std::pair<T, U>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_pair_v = is_pair<T>::value;
 
+// Type trait for tuple-like objects
+template <typename T, typename = void>
+struct is_tuple_like : std::false_type {};
+template <typename T>
+struct is_tuple_like<T, std::void_t<decltype(std::tuple_size<T>::value)>>
+    : std::true_type {};
+template <typename T>
+inline constexpr bool is_tuple_like_v = is_tuple_like<T>::value;
+
 // Type trait to detect whether an output function already exists
 template <typename T>
 struct has_output_function {
@@ -92,13 +101,9 @@ template <typename T>
 inline constexpr bool has_output_function_v =
     has_output_function<T>::value;
 
-// Output function for std::pair
-template <typename T, typename U>
-std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr);
-
-// Output function for std::tuple
-template <typename... Args>
-std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args);
+// Output function for tuple-like objects
+template <typename T, std::enable_if_t<is_tuple_like_v<T>, bool> = true>
+std::ostream& operator<<(std::ostream& os, const T& tup);
 
 // Element output function for containers that define a key_type and
 // have its value type as std::pair
@@ -114,8 +119,9 @@ auto output_element(std::ostream& os, const T& element,
 
 // Main output function, enabled only if no output function already exists
 template <typename Rng,
-          typename = std::enable_if_t<!has_output_function_v<
-              std::remove_cv_t<std::remove_reference_t<Rng>>>>>
+          std::enable_if_t<!has_output_function_v<std::remove_cv_t<
+                               std::remove_reference_t<Rng>>>,
+                           bool> = true>
 auto operator<<(std::ostream& os, Rng&& rng)
     -> decltype(output_range::adl_begin(std::forward<Rng>(rng)),
                 output_range::adl_end(std::forward<Rng>(rng)), os)
@@ -175,25 +181,20 @@ auto output_element(std::ostream& os, const T& element,
     return os;
 }
 
-template <typename T, typename U>
-std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr)
-{
-    os << '(' << pr.first << ", " << pr.second << ')';
-    return os;
-}
-
 template <typename Tup, std::size_t... Is>
 void output_tuple_members(std::ostream& os, const Tup& tup,
                           std::index_sequence<Is...>)
 {
-    ((os << (Is != 0 ? ", " : "") << std::get<Is>(tup)), ...);
+    using std::get;
+    ((os << (Is != 0 ? ", " : "") << get<Is>(tup)), ...);
 }
 
-template <typename... Args>
-std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& args)
+template <typename T, std::enable_if_t<is_tuple_like_v<T>, bool>>
+std::ostream& operator<<(std::ostream& os, const T& tup)
 {
     os << '(';
-    output_tuple_members(os, args, std::index_sequence_for<Args...>{});
+    output_tuple_members(os, tup,
+                         std::make_index_sequence<std::tuple_size_v<T>>{});
     os << ')';
     return os;
 }
