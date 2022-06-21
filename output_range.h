@@ -40,6 +40,11 @@
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
 #include <utility>      // std::declval/forward/pair
 
+#ifndef OUTPUT_RANGE_NO_STRING_QUOTE
+#include <string>       // std::string
+#include <string_view>  // std::string_view
+#endif
+
 namespace output_range {
 
 using std::begin;
@@ -205,9 +210,27 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
     } else if constexpr (std::is_same_v<T, unsigned char> ||
                          std::is_same_v<T, std::byte>) {
         os << static_cast<unsigned>(element);
-    } else {
+    } else
+#ifndef OUTPUT_RANGE_NO_STRING_QUOTE
+    {
+        using DT = std::decay_t<T>;
+        using PT = std::remove_cv_t<std::remove_pointer_t<DT>>;
+        if constexpr (std::is_same_v<T, std::string> ||
+                      std::is_same_v<T, std::string_view> ||
+                      (std::is_pointer_v<DT> &&
+                       (std::is_same_v<PT, char> ||
+                        std::is_same_v<PT, signed char> ||
+                        std::is_same_v<PT, unsigned char>))) {
+            os << '"' << element << '"';
+        } else {
+            os << element;
+        }
+    }
+#else
+    {
         os << element;
     }
+#endif
     return os;
 }
 
