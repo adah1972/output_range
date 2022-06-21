@@ -60,8 +60,6 @@ auto adl_end(Rng&& rng) -> decltype(end(rng))
     return end(rng);
 }
 
-}  // namespace output_range
-
 // Type trait to detect std::pair
 template <typename T>
 struct is_pair : std::false_type {};
@@ -85,7 +83,7 @@ struct has_output_function {
     template <class U>
     static auto output(U* ptr)
         -> decltype(std::declval<std::ostream&>() << *ptr,
-                    std::true_type());
+                    std::true_type{});
     template <class U>
     static std::false_type output(...);
     static constexpr bool value =
@@ -101,10 +99,6 @@ template <typename T>
 inline constexpr bool has_output_function_v =
     has_output_function<T>::value;
 
-// Output function for tuple-like objects
-template <typename T, std::enable_if_t<is_tuple_like_v<T>, bool> = true>
-std::ostream& operator<<(std::ostream& os, const T& tup);
-
 // Element output function for containers that define a key_type and
 // have its value type as std::pair
 template <typename T, typename Rng>
@@ -117,11 +111,24 @@ auto output_element(std::ostream& os, const T& element,
                     const Rng&, ...)
     -> decltype(os);
 
+// Member output function for tuple-like objects
+template <typename Tup, std::size_t... Is>
+void output_tuple_members(std::ostream& os, const Tup& tup,
+                          std::index_sequence<Is...>);
+
+}  // namespace output_range
+
+// Output function for tuple-like objects
+template <typename T,
+          std::enable_if_t<output_range::is_tuple_like_v<T>, bool> = true>
+std::ostream& operator<<(std::ostream& os, const T& tup);
+
 // Main output function, enabled only if no output function already exists
-template <typename Rng,
-          std::enable_if_t<!has_output_function_v<std::remove_cv_t<
-                               std::remove_reference_t<Rng>>>,
-                           bool> = true>
+template <
+    typename Rng,
+    std::enable_if_t<!output_range::has_output_function_v<
+                         std::remove_cv_t<std::remove_reference_t<Rng>>>,
+                     bool> = true>
 auto operator<<(std::ostream& os, Rng&& rng)
     -> decltype(output_range::adl_begin(std::forward<Rng>(rng)),
                 output_range::adl_end(std::forward<Rng>(rng)), os)
@@ -151,8 +158,8 @@ auto operator<<(std::ostream& os, Rng&& rng)
                 on_first_element = false;
             }
         }
-        output_element(os, *it, std::forward<Rng>(rng),
-                       is_pair<element_type>());
+        output_range::output_element(os, *it, std::forward<Rng>(rng),
+                                     output_range::is_pair<element_type>{});
     }
     if constexpr (!is_char_v) {
         if (!on_first_element) {  // Not empty
@@ -163,9 +170,22 @@ auto operator<<(std::ostream& os, Rng&& rng)
     return os;
 }
 
+template <typename T,
+          std::enable_if_t<output_range::is_tuple_like_v<T>, bool>>
+std::ostream& operator<<(std::ostream& os, const T& tup)
+{
+    os << '(';
+    output_range::output_tuple_members(
+        os, tup, std::make_index_sequence<std::tuple_size_v<T>>{});
+    os << ')';
+    return os;
+}
+
+namespace output_range {
+
 template <typename T, typename Rng>
-auto output_element(std::ostream& os, const T& element,
-                    const Rng&, std::true_type)
+auto output_element(std::ostream& os, const T& element, const Rng&,
+                    std::true_type)
     -> decltype(std::declval<typename Rng::key_type>(), os)
 {
     os << element.first << " => " << element.second;
@@ -173,8 +193,8 @@ auto output_element(std::ostream& os, const T& element,
 }
 
 template <typename T, typename Rng>
-auto output_element(std::ostream& os, const T& element,
-                    const Rng&, ...)
+auto output_element(std::ostream& os, const T& element, const Rng&,
+                    ...)
     -> decltype(os)
 {
     os << element;
@@ -189,14 +209,6 @@ void output_tuple_members(std::ostream& os, const Tup& tup,
     ((os << (Is != 0 ? ", " : "") << get<Is>(tup)), ...);
 }
 
-template <typename T, std::enable_if_t<is_tuple_like_v<T>, bool>>
-std::ostream& operator<<(std::ostream& os, const T& tup)
-{
-    os << '(';
-    output_tuple_members(os, tup,
-                         std::make_index_sequence<std::tuple_size_v<T>>{});
-    os << ')';
-    return os;
-}
+}  // namespace output_range
 
 #endif  // OUTPUT_RANGE_H
