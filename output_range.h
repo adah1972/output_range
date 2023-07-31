@@ -83,6 +83,16 @@ struct is_tuple_like<T, std::void_t<decltype(std::tuple_size<T>::value)>>
 template <typename T>
 inline constexpr bool is_tuple_like_v = is_tuple_like<T>::value;
 
+// Type traits for ranges
+template <typename T, typename = void>
+struct is_range : std::false_type {};
+template <typename T>
+struct is_range<T, std::void_t<decltype(adl_begin(std::declval<T>()),
+                                        adl_end(std::declval<T>()))>>
+    : std::true_type {};
+template <typename T>
+inline constexpr bool is_range_v = is_range<T>::value;
+
 // Type trait to detect whether an output function already exists
 template <typename T>
 struct has_output_function {
@@ -135,19 +145,19 @@ void output_tuple_members(std::ostream& os, const Tup& tup,
 }  // namespace output_range
 
 // Output function for tuple-like objects
-template <typename T,
-          std::enable_if_t<output_range::is_tuple_like_v<T>, bool> = true>
+template <typename T, std::enable_if_t<(output_range::is_tuple_like_v<T> &&
+                                        !output_range::is_range_v<T>),
+                                       bool> = true>
 std::ostream& operator<<(std::ostream& os, const T& tup);
 
 // Main output function, enabled only if no output function already exists
 template <
     typename Rng,
-    std::enable_if_t<!output_range::has_output_function_v<
-                         std::remove_cv_t<std::remove_reference_t<Rng>>>,
+    std::enable_if_t<(output_range::is_range_v<Rng> &&
+                      !output_range::has_output_function_v<
+                          std::remove_cv_t<std::remove_reference_t<Rng>>>),
                      bool> = true>
-auto operator<<(std::ostream& os, Rng&& rng)
-    -> decltype(output_range::adl_begin(std::forward<Rng>(rng)),
-                output_range::adl_end(std::forward<Rng>(rng)), os)
+std::ostream& operator<<(std::ostream& os, Rng&& rng)
 {
     using std::decay_t;
     using std::is_same_v;
@@ -175,8 +185,9 @@ auto operator<<(std::ostream& os, Rng&& rng)
     return os;
 }
 
-template <typename T,
-          std::enable_if_t<output_range::is_tuple_like_v<T>, bool>>
+template <typename T, std::enable_if_t<(output_range::is_tuple_like_v<T> &&
+                                        !output_range::is_range_v<T>),
+                                       bool>>
 std::ostream& operator<<(std::ostream& os, const T& tup)
 {
     os << '(';
