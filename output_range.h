@@ -38,7 +38,7 @@
 #include <ostream>      // std::ostream
 #include <tuple>        // std::tuple/tuple_size
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
-#include <utility>      // std::declval/forward/pair
+#include <utility>      // std::declval/pair
 
 #ifndef OUTPUT_RANGE_NO_STRING_QUOTE
 #include <string>       // std::string
@@ -162,20 +162,18 @@ std::ostream& operator<<(std::ostream& os, Rng&& rng)
     using std::decay_t;
     using std::is_same_v;
 
-    using element_type =
-        decay_t<decltype(*output_range::adl_begin(std::forward<Rng>(rng)))>;
+    using element_type = decay_t<decltype(*output_range::adl_begin(rng))>;
     os << '{';
-    auto end = output_range::adl_end(std::forward<Rng>(rng));
+    auto end = output_range::adl_end(rng);
     bool on_first_element = true;
-    for (auto it = output_range::adl_begin(std::forward<Rng>(rng));
-         it != end; ++it) {
+    for (auto it = output_range::adl_begin(rng); it != end; ++it) {
         if (!on_first_element) {
             os << ", ";
         } else {
             os << ' ';
             on_first_element = false;
         }
-        output_range::output_element(os, *it, std::forward<Rng>(rng),
+        output_range::output_element(os, *it, rng,
                                      output_range::is_pair<element_type>{});
     }
     if (!on_first_element) {  // Not empty
