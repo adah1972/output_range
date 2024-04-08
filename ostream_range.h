@@ -30,8 +30,8 @@
  *
  */
 
-#ifndef OUTPUT_RANGE_H
-#define OUTPUT_RANGE_H
+#ifndef OSTREAM_RANGE_H
+#define OSTREAM_RANGE_H
 
 #include <cstddef>      // std::byte
 #include <iterator>     // std::begin/end
@@ -40,12 +40,12 @@
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v/remove_...
 #include <utility>      // std::declval/pair
 
-#ifndef OUTPUT_RANGE_NO_STRING_QUOTE
+#ifndef OSTREAM_RANGE_NO_STRING_QUOTE
 #include <string>       // std::string
 #include <string_view>  // std::string_view
 #endif
 
-namespace output_range {
+namespace ostream_range {
 
 using std::begin;
 using std::end;
@@ -105,7 +105,7 @@ struct has_output_function {
     static constexpr bool value =
         decltype(output<T>(nullptr))::value;
 };
-#ifndef OUTPUT_RANGE_NO_ARRAY_OUTPUT
+#ifndef OSTREAM_RANGE_NO_ARRAY_OUTPUT
 template <typename T, std::size_t N>
 struct has_output_function<T[N]> : std::false_type {};
 template <std::size_t N>
@@ -142,19 +142,19 @@ template <typename Tup, std::size_t... Is>
 void output_tuple_members(std::ostream& os, const Tup& tup,
                           std::index_sequence<Is...>);
 
-}  // namespace output_range
+} // namespace ostream_range
 
 // Output function for tuple-like objects
-template <typename T, std::enable_if_t<(output_range::is_tuple_like_v<T> &&
-                                        !output_range::is_range_v<T>),
+template <typename T, std::enable_if_t<(ostream_range::is_tuple_like_v<T> &&
+                                        !ostream_range::is_range_v<T>),
                                        bool> = true>
 std::ostream& operator<<(std::ostream& os, const T& tup);
 
 // Main output function, enabled only if no output function already exists
 template <
     typename Rng,
-    std::enable_if_t<(output_range::is_range_v<Rng> &&
-                      !output_range::has_output_function_v<
+    std::enable_if_t<(ostream_range::is_range_v<Rng> &&
+                      !ostream_range::has_output_function_v<
                           std::remove_cv_t<std::remove_reference_t<Rng>>>),
                      bool> = true>
 std::ostream& operator<<(std::ostream& os, Rng&& rng)
@@ -162,19 +162,19 @@ std::ostream& operator<<(std::ostream& os, Rng&& rng)
     using std::decay_t;
     using std::is_same_v;
 
-    using element_type = decay_t<decltype(*output_range::adl_begin(rng))>;
+    using element_type = decay_t<decltype(*ostream_range::adl_begin(rng))>;
     os << '{';
-    auto end = output_range::adl_end(rng);
+    auto end = ostream_range::adl_end(rng);
     bool on_first_element = true;
-    for (auto it = output_range::adl_begin(rng); it != end; ++it) {
+    for (auto it = ostream_range::adl_begin(rng); it != end; ++it) {
         if (!on_first_element) {
             os << ", ";
         } else {
             os << ' ';
             on_first_element = false;
         }
-        output_range::output_element(os, *it, rng,
-                                     output_range::is_pair<element_type>{});
+        ostream_range::output_element(
+            os, *it, rng, ostream_range::is_pair<element_type>{});
     }
     if (!on_first_element) {  // Not empty
         os << ' ';
@@ -183,19 +183,19 @@ std::ostream& operator<<(std::ostream& os, Rng&& rng)
     return os;
 }
 
-template <typename T, std::enable_if_t<(output_range::is_tuple_like_v<T> &&
-                                        !output_range::is_range_v<T>),
+template <typename T, std::enable_if_t<(ostream_range::is_tuple_like_v<T> &&
+                                        !ostream_range::is_range_v<T>),
                                        bool>>
 std::ostream& operator<<(std::ostream& os, const T& tup)
 {
     os << '(';
-    output_range::output_tuple_members(
+    ostream_range::output_tuple_members(
         os, tup, std::make_index_sequence<std::tuple_size_v<T>>{});
     os << ')';
     return os;
 }
 
-namespace output_range {
+namespace ostream_range {
 
 template <typename T, typename Rng>
 auto output_element(std::ostream& os, const T& element, const Rng&,
@@ -220,7 +220,7 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
                          std::is_same_v<T, std::byte>) {
         os << static_cast<unsigned>(element);
     } else
-#ifndef OUTPUT_RANGE_NO_STRING_QUOTE
+#ifndef OSTREAM_RANGE_NO_STRING_QUOTE
     {
         using DT = std::decay_t<T>;
         using PT = std::remove_cv_t<std::remove_pointer_t<DT>>;
@@ -252,6 +252,6 @@ void output_tuple_members(std::ostream& os, const Tup& tup,
      ...);
 }
 
-}  // namespace output_range
+} // namespace ostream_range
 
-#endif  // OUTPUT_RANGE_H
+#endif // OSTREAM_RANGE_H
