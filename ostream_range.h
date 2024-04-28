@@ -41,6 +41,7 @@
 #include <utility>      // std::declval/pair
 
 #ifndef OSTREAM_RANGE_NO_STRING_QUOTE
+#include <iomanip>      // std::quoted
 #include <string>       // std::string
 #include <string_view>  // std::string_view
 #endif
@@ -215,7 +216,17 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
 {
     if constexpr (std::is_same_v<T, char> ||
                   std::is_same_v<T, signed char>) {
-        os << '\'' << element << '\'';
+        switch (element) {
+        case '\'':
+            os << "'\\''";
+            break;
+        case '\\':
+            os << "'\\\\'";
+            break;
+        default:
+            os << '\'' << element << '\'';
+            break;
+        }
     } else if constexpr (std::is_same_v<T, unsigned char> ||
                          std::is_same_v<T, std::byte>) {
         os << static_cast<unsigned>(element);
@@ -223,14 +234,16 @@ auto output_element(std::ostream& os, const T& element, const Rng&,
 #ifndef OSTREAM_RANGE_NO_STRING_QUOTE
     {
         using DT = std::decay_t<T>;
-        using PT = std::remove_cv_t<std::remove_pointer_t<DT>>;
+        using PT = std::remove_const_t<std::remove_pointer_t<DT>>;
         if constexpr (std::is_same_v<T, std::string> ||
                       std::is_same_v<T, std::string_view> ||
-                      (std::is_pointer_v<DT> &&
-                       (std::is_same_v<PT, char> ||
-                        std::is_same_v<PT, signed char> ||
-                        std::is_same_v<PT, unsigned char>))) {
-            os << '"' << element << '"';
+                      (std::is_pointer_v<DT> && std::is_same_v<PT, char>)) {
+            os << std::quoted(element);
+        } else if constexpr ((std::is_pointer_v<DT> &&
+                              (std::is_same_v<PT, signed char> ||
+                               std::is_same_v<PT, unsigned char>))) {
+            // std::quoted does not work for these two cases directly
+            os << std::quoted(reinterpret_cast<const char*>(element));
         } else {
             os << element;
         }
